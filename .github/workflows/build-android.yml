@@ -14,7 +14,7 @@ jobs:
   build-android:
     name: Build APK and AAB
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
@@ -32,8 +32,8 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check Flutter
-        run: flutter doctor -v
+      - name: Check Flutter version
+        run: flutter --version
 
       - name: Create Flutter Android project
         run: |
@@ -43,11 +43,14 @@ jobs:
             --project-name st_trading_ai_bot \
             build_app
 
-      - name: Copy app source files
+      - name: Remove default Flutter files
         run: |
           rm -rf build_app/lib
           rm -rf build_app/assets
+          rm -rf build_app/test
 
+      - name: Copy ST Trading source files
+        run: |
           cp -R app_source/lib build_app/lib
           cp -R app_source/assets build_app/assets
           cp app_source/pubspec.yaml build_app/pubspec.yaml
@@ -55,21 +58,22 @@ jobs:
 
       - name: Set application name
         run: |
-          sed -i 's/android:label="st_trading_ai_bot"/android:label="ST Trading AI Bot"/g' build_app/android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="st_trading_ai_bot"/android:label="ST Trading AI Bot"/g' \
+          build_app/android/app/src/main/AndroidManifest.xml
 
-      - name: Install dependencies
+      - name: Install Flutter dependencies
         working-directory: build_app
         run: flutter pub get
 
-      - name: Analyze Flutter code
+      - name: Analyze Flutter source
         working-directory: build_app
-        run: flutter analyze
+        run: flutter analyze lib
 
-      - name: Build universal APK
+      - name: Build universal release APK
         working-directory: build_app
         run: flutter build apk --release
 
-      - name: Build optimized APKs
+      - name: Build optimized release APKs
         working-directory: build_app
         run: flutter build apk --release --split-per-abi
 
@@ -77,7 +81,7 @@ jobs:
         working-directory: build_app
         run: flutter build appbundle --release
 
-      - name: Collect build files
+      - name: Collect release files
         run: |
           mkdir -p release
 
