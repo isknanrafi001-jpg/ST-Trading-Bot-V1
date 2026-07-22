@@ -1,0 +1,107 @@
+name: Build ST Trading AI Bot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    name: Build APK and AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Check Flutter
+        run: flutter doctor -v
+
+      - name: Create Flutter Android project
+        run: |
+          flutter create \
+            --platforms=android \
+            --org com.sttrading \
+            --project-name st_trading_ai_bot \
+            build_app
+
+      - name: Copy app source files
+        run: |
+          rm -rf build_app/lib
+          rm -rf build_app/assets
+
+          cp -R app_source/lib build_app/lib
+          cp -R app_source/assets build_app/assets
+          cp app_source/pubspec.yaml build_app/pubspec.yaml
+          cp app_source/analysis_options.yaml build_app/analysis_options.yaml
+
+      - name: Set application name
+        run: |
+          sed -i 's/android:label="st_trading_ai_bot"/android:label="ST Trading AI Bot"/g' build_app/android/app/src/main/AndroidManifest.xml
+
+      - name: Install dependencies
+        working-directory: build_app
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        working-directory: build_app
+        run: flutter analyze
+
+      - name: Build universal APK
+        working-directory: build_app
+        run: flutter build apk --release
+
+      - name: Build optimized APKs
+        working-directory: build_app
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build Play Store AAB
+        working-directory: build_app
+        run: flutter build appbundle --release
+
+      - name: Collect build files
+        run: |
+          mkdir -p release
+
+          cp build_app/build/app/outputs/flutter-apk/app-release.apk \
+          release/ST-Trading-AI-Bot-Universal.apk
+
+          cp build_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+          release/ST-Trading-AI-Bot-arm64-v8a.apk
+
+          cp build_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+          release/ST-Trading-AI-Bot-armeabi-v7a.apk
+
+          cp build_app/build/app/outputs/flutter-apk/app-x86_64-release.apk \
+          release/ST-Trading-AI-Bot-x86_64.apk
+
+          cp build_app/build/app/outputs/bundle/release/app-release.aab \
+          release/ST-Trading-AI-Bot-PlayStore.aab
+
+          ls -lah release
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: ST-Trading-AI-Bot-Production-Build
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
