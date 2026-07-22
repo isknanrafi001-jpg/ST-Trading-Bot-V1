@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum MarketType {
+  REAL
+  OTC
+}
+
+enum Direction {
+  UP
+  DOWN
+}
+
+enum Recommendation {
+  TRADE
+  NO_TRADE
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  displayName  String?
+  role         Role           @default(USER)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     RefreshSession[]
+  signals      Signal[]
+  favorites    Favorite[]
+}
+
+model RefreshSession {
+  id        String   @id @default(cuid())
+  tokenHash String
+  deviceId  String?
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MarketPair {
+  id        String     @id @default(cuid())
+  symbol    String
+  market    MarketType
+  enabled   Boolean    @default(true)
+  payout    Int?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  signals   Signal[]
+
+  @@unique([symbol, market])
+}
+
+model Signal {
+  id             String         @id @default(cuid())
+  userId         String?
+  marketPairId   String
+  direction      Direction
+  recommendation Recommendation
+  confidence     Float
+  risk           String
+  grade          String
+  trend          String
+  volatility     String
+  support        Float?
+  resistance     Float?
+  reasons        Json
+  createdAt      DateTime       @default(now())
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  marketPair     MarketPair     @relation(fields: [marketPairId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model Favorite {
+  id           String     @id @default(cuid())
+  userId       String
+  marketPairId String
+  createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  marketPair   MarketPair @relation(fields: [marketPairId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, marketPairId])
+}
